@@ -31,10 +31,24 @@ class Handler(BaseHTTPRequestHandler):
 
 
 if __name__ == "__main__":
-    with ThreadingHTTPServer(("127.0.0.1", 0), Handler) as server:
-        url = f"http://127.0.0.1:{server.server_port}/"
-        print(f"Odyssey is running at {url}", flush=True)
-        webbrowser.open(url)
+    import os
+
+    # Render sets PORT env var; locally use random free port
+    port = int(os.environ.get("PORT", "0"))
+    host = "0.0.0.0" if "PORT" in os.environ else "127.0.0.1"
+    bind_port = port if port != 0 else 0
+
+    with ThreadingHTTPServer((host, bind_port), Handler) as server:
+        actual_port = server.server_port
+        if "PORT" in os.environ:
+            print(f"Odyssey is running on port {actual_port}", flush=True)
+        else:
+            url = f"http://127.0.0.1:{actual_port}/"
+            print(f"Odyssey is running at {url}", flush=True)
+            try:
+                webbrowser.open(url)
+            except Exception:
+                pass
         try:
             server.serve_forever()
         except KeyboardInterrupt:

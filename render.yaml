@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: voucher-generator
+    env: python
+    plan: free
+    buildCommand: ""
+    startCommand: "python odyssey-local.py"
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.0
+    healthCheckPath: /
+    autoDeploy: false
