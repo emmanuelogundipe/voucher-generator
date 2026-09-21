@@ -1,0 +1,1514 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Voucher Generator — PF Payment Voucher Builder</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<style>
+  :root{
+    --ink:#1c2430;
+    --paper:#f6f4ef;
+    --panel:#ffffff;
+    --line:#dcd6c8;
+    --accent:#1c7fb8;
+    --accent-dark:#145d87;
+    --green:#2e9e66;
+    --green-line:#1f7a4d;
+    --gold:#cf9c3f;
+    --gold-line:#a97c28;
+    --purple:#4c4a86;
+    --purple-line:#38365f;
+    --muted:#6b7280;
+    --danger:#b3432f;
+    font-family: "Iowan Old Style","Georgia",serif;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--paper);
+    color:var(--ink);
+    font-family: "Helvetica Neue", Arial, sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  .app{
+    max-width:1180px;
+    margin:0 auto;
+    padding:32px 24px 80px;
+  }
+  header.masthead{
+    display:flex;
+    align-items:baseline;
+    justify-content:space-between;
+    gap:16px;
+    border-bottom:3px solid var(--ink);
+    padding-bottom:14px;
+    margin-bottom:28px;
+    flex-wrap:wrap;
+  }
+  header.masthead h1{
+    font-family:"Iowan Old Style","Georgia",serif;
+    font-size:26px;
+    margin:0;
+    letter-spacing:0.2px;
+  }
+  header.masthead p{
+    margin:4px 0 0;
+    color:var(--muted);
+    font-size:13.5px;
+    max-width:520px;
+  }
+  .step-nav{
+    display:flex;
+    gap:6px;
+    margin-bottom:22px;
+    flex-wrap:wrap;
+  }
+  .step-nav button{
+    border:1px solid var(--line);
+    background:var(--panel);
+    padding:9px 16px;
+    border-radius:999px;
+    font-size:13px;
+    cursor:pointer;
+    color:var(--muted);
+    font-family: Arial, sans-serif;
+  }
+  .step-nav button.active{
+    background:var(--ink);
+    color:#fff;
+    border-color:var(--ink);
+  }
+  .step-nav button.done{
+    color:var(--green-line);
+    border-color:var(--green-line);
+  }
+  section.panel{
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:10px;
+    padding:26px 28px;
+    margin-bottom:22px;
+    display:none;
+  }
+  section.panel.visible{ display:block; }
+  section.panel h2{
+    font-family:"Iowan Old Style","Georgia",serif;
+    font-size:19px;
+    margin:0 0 6px;
+  }
+  section.panel > p.hint{
+    color:var(--muted);
+    font-size:13.5px;
+    margin:0 0 20px;
+    max-width:640px;
+    line-height:1.5;
+  }
+  .import-grid{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:18px;
+  }
+  @media (max-width:820px){ .import-grid{ grid-template-columns:1fr; } }
+  .import-card{
+    border:1px dashed var(--line);
+    border-radius:8px;
+    padding:18px;
+  }
+  .import-card h3{
+    font-size:14px;
+    margin:0 0 4px;
+    font-family: Arial, sans-serif;
+  }
+  .import-card p{
+    font-size:12.5px;
+    color:var(--muted);
+    margin:0 0 12px;
+    line-height:1.5;
+  }
+  input[type="text"], input[type="url"], textarea, select{
+    width:100%;
+    padding:9px 10px;
+    border:1px solid var(--line);
+    border-radius:6px;
+    font-size:13.5px;
+    font-family: Arial, sans-serif;
+    background:#fff;
+    color:var(--ink);
+  }
+  textarea{ resize:vertical; min-height:90px; font-family: Menlo, Consolas, monospace; font-size:12px;}
+  input[type="file"]{ font-size:13px; }
+  button.btn{
+    background:var(--accent);
+    color:#fff;
+    border:none;
+    padding:10px 18px;
+    border-radius:6px;
+    font-size:13.5px;
+    cursor:pointer;
+    font-family:Arial, sans-serif;
+    font-weight:600;
+  }
+  button.btn:hover{ background:var(--accent-dark); }
+  button.btn.secondary{
+    background:transparent;
+    color:var(--ink);
+    border:1px solid var(--line);
+  }
+  button.btn.secondary:hover{ background:#f0eee7; }
+  button.btn:disabled{ opacity:0.45; cursor:not-allowed; }
+  .row-inline{ display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-top:10px;}
+  .status-msg{
+    font-size:12.5px;
+    margin-top:10px;
+    padding:8px 10px;
+    border-radius:6px;
+    display:none;
+  }
+  .status-msg.ok{ display:block; background:#e8f6ee; color:var(--green-line); }
+  .status-msg.err{ display:block; background:#fbeae6; color:var(--danger); }
+
+  table.data-table{
+    width:100%;
+    border-collapse:collapse;
+    font-size:12px;
+    font-family: Arial, sans-serif;
+  }
+  table.data-table th, table.data-table td{
+    border:1px solid var(--line);
+    padding:6px 8px;
+    text-align:left;
+    white-space:nowrap;
+  }
+  table.data-table th{
+    background:#f0eee7;
+    position:sticky;
+    top:0;
+  }
+  table.data-table td[contenteditable="true"]{
+    background:#fffef9;
+  }
+  table.data-table td[contenteditable="true"]:focus{
+    outline:2px solid var(--accent);
+    outline-offset:-2px;
+  }
+  .table-scroll{
+    max-height:360px;
+    overflow:auto;
+    border:1px solid var(--line);
+    border-radius:8px;
+  }
+  .table-toolbar{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    margin-bottom:10px;
+    flex-wrap:wrap;
+    gap:8px;
+  }
+  .table-toolbar .count{ font-size:12.5px; color:var(--muted); }
+  td.photo-cell{
+    text-align:center;
+    white-space:normal !important;
+  }
+  .photo-cell .thumb{
+    width:40px;height:40px;object-fit:cover;border:1px solid var(--line);border-radius:4px;display:block;margin:0 auto 4px;
+  }
+  .photo-cell .placeholder-thumb{
+    width:40px;height:40px;border:1px dashed var(--line);border-radius:4px;margin:0 auto 4px;
+    display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:16px;
+  }
+  .photo-cell input[type="file"]{
+    font-size:10px; width:78px;
+  }
+  .photo-cell .clear-photo{
+    display:block; margin:2px auto 0; font-size:10px; border:none; background:none; color:var(--danger); cursor:pointer;
+  }
+
+  .mapping-grid{
+    display:grid;
+    grid-template-columns:repeat(3,1fr);
+    gap:16px;
+  }
+  @media (max-width:900px){ .mapping-grid{ grid-template-columns:1fr 1fr; } }
+  @media (max-width:600px){ .mapping-grid{ grid-template-columns:1fr; } }
+  .map-field label{
+    display:block;
+    font-size:12.5px;
+    font-weight:600;
+    margin-bottom:5px;
+    font-family: Arial, sans-serif;
+  }
+  .map-field span.req{ color:var(--danger); }
+  .map-field small{
+    display:block;
+    color:var(--muted);
+    font-size:11px;
+    margin-top:3px;
+  }
+
+  .settings-grid{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:18px;
+  }
+  @media (max-width:700px){ .settings-grid{ grid-template-columns:1fr; } }
+  .field label{
+    display:block;
+    font-size:12.5px;
+    font-weight:600;
+    margin-bottom:5px;
+    font-family: Arial, sans-serif;
+  }
+  .field{ margin-bottom:14px; }
+  .color-rules{
+    border:1px solid var(--line);
+    border-radius:8px;
+    padding:14px;
+    margin-top:6px;
+  }
+  .color-rule-row{
+    display:grid;
+    grid-template-columns:1fr 140px 32px;
+    gap:8px;
+    align-items:center;
+    margin-bottom:8px;
+  }
+  .swatch{
+    width:20px;height:20px;border-radius:4px;display:inline-block;vertical-align:middle;margin-right:6px;border:1px solid rgba(0,0,0,.15);
+  }
+  .swatch.green{background:var(--green);}
+  .swatch.gold{background:var(--gold);}
+  .swatch.purple{background:var(--purple);}
+  .swatch.gray{background:#8a8a8a;}
+  .remove-x{
+    background:none;border:none;color:var(--danger);cursor:pointer;font-size:15px;
+  }
+
+  .actions-bar{
+    display:flex;
+    justify-content:space-between;
+    margin-top:22px;
+    gap:10px;
+  }
+
+  /* ---------- Voucher preview / export template ---------- */
+  #previewWrap{
+    background:#e9e6dd;
+    padding:24px;
+    border-radius:10px;
+    overflow:auto;
+  }
+  .pdf-page{
+    background:#ffffff;
+    width:1000px;
+    margin:0 auto 28px;
+    padding:26px 30px 34px;
+    box-shadow:0 2px 10px rgba(0,0,0,.12);
+    page-break-after:always;
+    font-family: Arial, Helvetica, sans-serif;
+  }
+  .pdf-page:last-child{ margin-bottom:0; }
+  .v-banner{
+    background:var(--accent);
+    height:70px;
+    border-radius:2px;
+    position:relative;
+    margin-bottom:6px;
+  }
+  .v-logo{
+    position:absolute;
+    left:50%;
+    top:8px;
+    transform:translateX(-50%);
+    width:78px;
+    height:78px;
+    border-radius:50%;
+    background:#fff;
+    border:3px solid #fff;
+    box-shadow:0 1px 4px rgba(0,0,0,.25);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    overflow:hidden;
+    font-size:9px;
+    color:var(--muted);
+    text-align:center;
+  }
+  .v-logo img{ width:100%; height:100%; object-fit:cover; }
+  .v-partner-row{
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    gap:14px;
+    margin:6px 0 4px;
+    flex-wrap:wrap;
+  }
+  .v-partner-row img{
+    height:34px;
+    max-width:70px;
+    object-fit:contain;
+  }
+  .v-region-icon{
+    height:16px;
+    width:auto;
+    vertical-align:middle;
+    margin-right:5px;
+  }
+  .logo-thumb-list{
+    display:flex;
+    flex-wrap:wrap;
+    gap:8px;
+  }
+  .logo-thumb{
+    position:relative;
+    width:56px;
+    height:56px;
+    border:1px solid var(--line);
+    border-radius:6px;
+    background:#fff;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    overflow:hidden;
+  }
+  .logo-thumb img{ max-width:100%; max-height:100%; object-fit:contain; }
+  .logo-thumb button{
+    position:absolute;
+    top:-6px; right:-6px;
+    width:18px; height:18px;
+    border-radius:50%;
+    border:none;
+    background:var(--danger);
+    color:#fff;
+    font-size:11px;
+    line-height:1;
+    cursor:pointer;
+  }
+  .v-title{
+    text-align:center;
+    font-weight:700;
+    font-size:16px;
+    margin:14px 0 8px;
+    letter-spacing:0.2px;
+  }
+  .v-badge-row{ text-align:center; margin-bottom:10px; }
+  .v-badge{
+    display:inline-block;
+    background:var(--accent);
+    color:#fff;
+    font-weight:700;
+    font-size:13px;
+    padding:5px 22px;
+    border-radius:3px;
+  }
+  .v-meta-row{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    margin-bottom:10px;
+    font-size:13px;
+    font-weight:700;
+  }
+  .v-meta-row .group-label{
+    background:#dfe9ee;
+    padding:3px 10px;
+    border-radius:3px;
+  }
+  .v-card{
+    display:grid;
+    grid-template-columns: 1.35fr 1fr 1.35fr 1fr 1.5fr 0.85fr;
+    border:2px solid #222;
+    margin-bottom:10px;
+    font-size:11.5px;
+  }
+  .voucher-entry{break-inside:avoid;page-break-inside:avoid;}
+  .v-card .v-head{
+    color:#fff;
+    font-weight:700;
+    font-size:11px;
+    padding:5px 8px;
+    text-transform:uppercase;
+    border-right:1px solid rgba(255,255,255,.35);
+  }
+  .v-card .v-head:last-child{ border-right:none; }
+  .v-card .v-body{
+    background:#fff;
+    padding:6px 8px;
+    border-right:1px solid #222;
+    border-top:1px solid #222;
+    display:flex;
+    flex-direction:column;
+    justify-content:center;
+    min-height:64px;
+  }
+  .v-card .v-body:last-child{ border-right:none; }
+  .v-card.green .v-head{ background:var(--green); }
+  .v-card.gold .v-head{ background:var(--gold); }
+  .v-card.purple .v-head{ background:var(--purple); }
+  .v-card.gray .v-head{ background:#7c7c7c; }
+  .v-name-main{ font-weight:700; font-size:12px; border-bottom:1px solid #ccc; padding-bottom:3px; margin-bottom:3px;}
+  .v-name-sub{ font-size:9.5px; color:#333; line-height:1.5; }
+  .v-name-sub b{ font-weight:700; }
+  .v-position{ font-weight:700; text-align:center; font-size:11.5px; }
+  .v-photo{
+    display:flex; align-items:center; justify-content:center;
+  }
+  .v-photo img{
+    width:64px; height:64px; object-fit:cover; border:1px solid #999;
+  }
+  .v-photo .placeholder{
+    width:64px;height:64px;border:1px solid #999;background:#eee;
+    display:flex;align-items:center;justify-content:center;color:#999;font-size:22px;
+  }
+  .empty-note{
+    text-align:center;
+    color:var(--muted);
+    padding:60px 20px;
+    font-size:14px;
+  }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <header class="masthead">
+    <div>
+      <h1>Voucher Generator</h1>
+      <p>Pull participant data from your Google Sheet, a CSV, or a PDF export, and lay it out exactly like your PF Payment Voucher template — ready to download as a PDF.</p>
+    </div>
+  </header>
+
+  <div class="step-nav">
+    <button data-step="1" class="active">1 · Import data</button>
+    <button data-step="2">2 · Review rows</button>
+    <button data-step="3">3 · Map fields</button>
+    <button data-step="4">4 · Template settings</button>
+    <button data-step="5">5 · Preview &amp; export</button>
+  </div>
+
+  <!-- STEP 1: IMPORT -->
+  <section class="panel visible" id="panel-1">
+    <h2>Bring in your data</h2>
+    <p class="hint">Use whichever source you have. You can always fix cells by hand in the next step, so an imperfect import is fine to start with.</p>
+
+    <div class="import-grid">
+      <div class="import-card">
+        <h3>Google Sheet link</h3>
+        <p>Paste a Google Sheet link to import participant details and embedded passport photos together. The sheet must allow anyone with the link to view it.</p>
+        <input type="url" id="sheetUrl" placeholder="https://docs.google.com/spreadsheets/d/....">
+        <div class="row-inline">
+          <button class="btn" id="btnFetchSheet">Import details &amp; photos</button>
+        </div>
+        <div class="status-msg" id="sheetStatus"></div>
+        <p id="localFileHint" hidden>For automatic Google Sheets import, open <strong>Start Odyssey.cmd</strong> from the same folder, then paste your link in the window it opens.</p>
+      </div>
+
+      <div class="import-card">
+        <h3>CSV file</h3>
+        <p>Export your Google Sheet as File → Download → CSV, then upload it here.</p>
+        <input type="file" id="csvFile" accept=".csv,text/csv">
+        <div class="status-msg" id="csvStatus"></div>
+      </div>
+
+      <div class="import-card">
+        <h3>PDF export</h3>
+        <p>Upload a PDF export of your sheet. Text is pulled out automatically and split into rows/columns — this is a best-effort read, so double-check it on the next screen.</p>
+        <input type="file" id="pdfFile" accept="application/pdf">
+        <div class="status-msg" id="pdfStatus"></div>
+      </div>
+
+      <div class="import-card">
+        <h3>Paste CSV directly</h3>
+        <p>Copy cells from your sheet (or paste raw CSV text) straight in here.</p>
+        <textarea id="pasteCsv" placeholder="Name,Position,NGO,Phone,Address,..."></textarea>
+        <div class="row-inline">
+          <button class="btn secondary" id="btnUsePaste">Use pasted data</button>
+        </div>
+        <div class="status-msg" id="pasteStatus"></div>
+      </div>
+    </div>
+
+    <div class="actions-bar">
+      <span></span>
+      <button class="btn" id="toStep2" disabled>Next: review rows →</button>
+    </div>
+  </section>
+
+  <!-- STEP 2: REVIEW -->
+  <section class="panel" id="panel-2">
+    <h2>Review and fix your rows</h2>
+    <p class="hint">Every cell is editable — click a cell to correct anything the import got wrong. Use the buttons to add or remove rows and columns.</p>
+
+    <div class="import-card" style="margin-bottom:18px;">
+      <h3>Attach passport photos</h3>
+      <p>Google Sheet imports attach embedded passport photos automatically. For CSV or PDF imports, or to replace a photo, upload files here and match their filenames to participant names. You can also attach photos individually below.</p>
+      <input type="file" id="bulkPhotoFiles" accept="image/*" multiple>
+      <div class="row-inline">
+        <button class="btn secondary" id="btnMatchPhotos">Match to rows by filename</button>
+      </div>
+      <div class="status-msg" id="photoMatchStatus"></div>
+    </div>
+
+    <div class="table-toolbar">
+      <span class="count" id="rowCount">0 rows</span>
+      <div class="row-inline" style="margin-top:0;">
+        <button class="btn secondary" id="addRow">+ Add row</button>
+        <button class="btn secondary" id="addCol">+ Add column</button>
+      </div>
+    </div>
+    <div class="table-scroll">
+      <table class="data-table" id="dataTable"></table>
+    </div>
+
+    <div class="actions-bar">
+      <button class="btn secondary" id="back1">← Back</button>
+      <button class="btn" id="toStep3">Next: map fields →</button>
+    </div>
+  </section>
+
+  <!-- STEP 3: MAPPING -->
+  <section class="panel" id="panel-3">
+    <h2>Match your columns to the voucher fields</h2>
+    <p class="hint">Tell the system which of your columns holds each piece of information. Leave a field on "— none —" to skip it.</p>
+
+    <div class="mapping-grid" id="mappingGrid"></div>
+
+    <div class="actions-bar">
+      <button class="btn secondary" id="back2">← Back</button>
+      <button class="btn" id="toStep4">Next: template settings →</button>
+    </div>
+  </section>
+
+  <!-- STEP 4: TEMPLATE SETTINGS -->
+  <section class="panel" id="panel-4">
+    <h2>Match the look of your original template</h2>
+    <p class="hint">These control the banner text, labels and colour bands on each voucher page, so the output lines up with your original document.</p>
+
+    <div class="settings-grid">
+      <div>
+        <div class="field">
+          <label>Document title</label>
+          <input type="text" id="docTitle" value="HOPE PROJECT 2022, FAMILY RELIEF FUNDS">
+        </div>
+        <div class="field">
+          <label>Voucher badge text</label>
+          <input type="text" id="badgeText" value="PF PAYMENT VOUCHER">
+        </div>
+        <div class="field">
+          <label>Partner label (top right of each page)</label>
+          <input type="text" id="partnerLabel" value="PNG PARTNER">
+        </div>
+        <div class="field">
+          <label>Organisation column header</label>
+          <select id="orgHeader">
+            <option value="COMPANY / NGO">COMPANY / NGO</option>
+            <option value="NGO">NGO</option>
+            <option value="COMPANY">COMPANY</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Main banner logo (optional)</label>
+          <input type="file" id="logoFile" accept="image/*">
+          <small>Sits centred on the blue banner, like the "Hope Project 2022" emblem in your sample.</small>
+        </div>
+        <div class="field">
+          <label>Partner / certification logos (optional, add as many as you need)</label>
+          <input type="file" id="extraLogoFiles" accept="image/*" multiple>
+          <small>These appear in a row underneath the banner, in the order you add them — like the row of small badges under the main logo in your sample.</small>
+          <div id="extraLogoList" style="margin-top:8px;"></div>
+        </div>
+        <div class="field">
+          <label>Small badge icon next to the region label (optional)</label>
+          <input type="file" id="regionIconFile" accept="image/*">
+          <small>Shown just before the region text (e.g. the small "PNG" badge before "North Benue (1)" in your sample).</small>
+        </div>
+      </div>
+      <div>
+        <div class="field">
+          <label>Group pages by column (optional)</label>
+          <select id="groupByField"><option value="">— one single page, no grouping —</option></select>
+          <small>If your sheet has a region/zone/phase column, each unique value becomes its own voucher page — mirroring how your original was split into "North Benue", "South Bayelsa" etc.</small>
+        </div>
+        <div class="field">
+          <label>Append phase/group value to title</label>
+          <select id="appendGroupToTitle">
+            <option value="yes">Yes — show it in the title line</option>
+            <option value="no">No — title stays fixed</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <div class="color-rules">
+      <label style="font-size:12.5px;font-weight:600;font-family:Arial;display:block;margin-bottom:8px;">Row colour rules (checked in order, top to bottom, against the Position column)</label>
+      <div id="colorRulesList"></div>
+      <button class="btn secondary" id="addColorRule" style="margin-top:4px;">+ Add rule</button>
+    </div>
+
+    <div class="actions-bar">
+      <button class="btn secondary" id="back3">← Back</button>
+      <button class="btn" id="toStep5">Next: preview &amp; export →</button>
+    </div>
+  </section>
+
+  <!-- STEP 5: PREVIEW & EXPORT -->
+  <section class="panel" id="panel-5">
+    <h2>Preview and download</h2>
+    <p class="hint">This is exactly what will be exported. Scroll to check every page, then export as PDF.</p>
+
+    <div class="row-inline" style="margin-bottom:16px;">
+      <button class="btn" id="btnExportPdf">Download PDF</button>
+      <button class="btn secondary" id="btnRefreshPreview">Refresh preview</button>
+      <button class="btn secondary" id="back4">← Back to settings</button>
+    </div>
+    <div class="status-msg" id="exportStatus"></div>
+    <div class="status-msg" id="importSummary"></div>
+
+    <div id="previewWrap">
+      <div id="previewContent"><div class="empty-note">Nothing to preview yet — complete the earlier steps first.</div></div>
+    </div>
+  </section>
+
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  // ---------------- state ----------------
+  const state = {
+    headers: [],
+    rows: [],       // array of arrays, same order as headers
+    mapping: {},    // field -> header name
+    colorRules: [
+      {contains:"CEO", color:"green"},
+      {contains:"ADMIN", color:"gold"},
+      {contains:"COORDINATOR", color:"gold"},
+      {contains:"TREASURER", color:"gold"},
+      {contains:"SECRETARY", color:"gold"},
+      {contains:"SUPERVISOR", color:"purple"}
+    ],
+    logoDataUrl: null,
+    extraLogos: [],
+    regionIconDataUrl: null,
+    photoOverrides: {}   // rowIndex -> dataURL, takes priority over any mapped photo column
+  };
+
+  const FIELD_DEFS = [
+    {key:"name", label:"Full name", required:true},
+    {key:"position", label:"Position / role", required:true},
+    {key:"org", label:"NGO / Organisation name", required:false},
+    {key:"company", label:"Company name", required:false},
+    {key:"phone", label:"Phone number", required:false},
+    {key:"address", label:"Address", required:false},
+    {key:"photo", label:"Passport photo (image URL)", required:false},
+    {key:"acctNo", label:"Account number", required:false},
+    {key:"bankName", label:"Bank name", required:false},
+    {key:"acctName", label:"Account name", required:false}
+  ];
+
+  // ---------------- helpers ----------------
+  function setStatus(id, msg, ok){
+    const el = document.getElementById(id);
+    el.textContent = msg;
+    el.className = "status-msg " + (ok ? "ok" : "err");
+  }
+
+  function prepareRows(arr){
+    if(!arr || arr.length < 2) throw new Error("No participant rows were found.");
+    const used = new Set();
+    const headers = arr[0].map((h, i) => {
+      const base = String(h ?? "").trim() || "Column " + (i + 1);
+      let name = base, suffix = 2;
+      while(used.has(name)) name = base + " (" + suffix++ + ")";
+      used.add(name);
+      return name;
+    });
+    const rows = [], sourceRows = new Map();
+    arr.slice(1).forEach((r, i) => {
+      if(!r.some(c => String(c ?? "").trim() !== "")) return;
+      sourceRows.set(i + 1, rows.length); // XLSX anchors use zero-based sheet row numbers.
+      rows.push(headers.map((_, ci) => String(r[ci] ?? "")));
+    });
+    if(!rows.length) throw new Error("No participant rows were found.");
+    return {headers, rows, sourceRows};
+  }
+
+  function applyRows(prepared, photos = {}){
+    state.headers = prepared.headers;
+    state.rows = prepared.rows;
+    state.mapping = {}; // A new source must never inherit another person's photos or mappings.
+    state.photoOverrides = photos;
+    document.getElementById("groupByField").value = "";
+    document.getElementById("bulkPhotoFiles").value = "";
+    ["photoMatchStatus", "importSummary", "exportStatus"].forEach(id => {
+      document.getElementById(id).className = "status-msg";
+      document.getElementById(id).textContent = "";
+    });
+    document.getElementById("toStep2").disabled = false;
+    renderTable();
+    const org = state.mapping.org, company = state.mapping.company;
+    document.getElementById("orgHeader").value = org && company ? "COMPANY / NGO" : company ? "COMPANY" : "NGO";
+  }
+
+  function loadRowsFromArrayOfArrays(arr){
+    try{ applyRows(prepareRows(arr)); return true; }
+    catch{ return false; }
+  }
+
+  function parseCsvText(text){
+    const result = Papa.parse(text.trim(), {skipEmptyLines:true});
+    return result.data;
+  }
+
+  function sheetExportUrls(input){
+    const url = new URL(input);
+    const id = url.pathname.match(/^\/spreadsheets\/d\/([\w-]+)(?:\/|$)/)?.[1];
+    if(url.protocol !== "https:" || url.hostname !== "docs.google.com" || !id)
+      throw new Error("Enter a Google Sheets sharing link.");
+    const gid = url.searchParams.get("gid") || new URLSearchParams(url.hash.slice(1)).get("gid") || "";
+    if(gid && !/^\d+$/.test(gid)) throw new Error("The sheet tab ID is invalid.");
+    const base = `https://docs.google.com/spreadsheets/d/${id}/export`;
+    return {csv: gid ? `${base}?format=csv&gid=${gid}` : `${base}?format=csv`, xlsx: `${base}?format=xlsx`};
+  }
+
+  function guessField(headers, key){
+    const patterns = {
+      name: /^(?:full\s*name|name|participant(?:\s+full)?\s+name|beneficiary\s+name)$/,
+      position: /\b(?:position|role|designation|title)\b/,
+      org: /\b(?:ngo|organisation|organization)\b/,
+      company: /\bcompany\b/,
+      phone: /\b(?:phone|mobile|telephone|contact)\b/,
+      address: /^(?:(?:home|residential|postal|office|contact|street)\s+)?address$/,
+      photo: /\b(?:photo|passport|image|picture)\b/,
+      acctNo: /\b(?:acct|account)\s*(?:no|number|num)\b/,
+      acctName: /\b(?:acct|account)\s*name\b/,
+      bankName: /\bbank\b/
+    };
+    return headers.find(h => patterns[key].test(h.toLowerCase().replace(/^\s*\d+[\s.)\-:]*/, "").replace(/[^a-z0-9]+/g, " ").trim())) || "";
+  }
+
+  const xmlNodes = (root, name) => Array.from(root.getElementsByTagNameNS("*", name));
+  const xmlText = (root, name) => xmlNodes(root, name)[0]?.textContent || "";
+  const relationId = (node, name) => node.getAttributeNS("http://schemas.openxmlformats.org/officeDocument/2006/relationships", name);
+
+  async function readXml(zip, path){
+    const file = zip.file(path);
+    if(!file) throw new Error("The spreadsheet export is missing " + path + ".");
+    const doc = new DOMParser().parseFromString(await file.async("string"), "application/xml");
+    if(xmlNodes(doc, "parsererror").length) throw new Error("The spreadsheet export contains invalid XML.");
+    return doc;
+  }
+
+  async function relationships(zip, part){
+    const slash = part.lastIndexOf("/");
+    const path = part.slice(0, slash + 1) + "_rels/" + part.slice(slash + 1) + ".rels";
+    const result = new Map();
+    if(!zip.file(path)) return result;
+    for(const rel of xmlNodes(await readXml(zip, path), "Relationship")){
+      if(rel.getAttribute("TargetMode") === "External") continue;
+      const resolved = new URL(rel.getAttribute("Target"), "https://workbook.invalid/" + part);
+      if(resolved.origin !== "https://workbook.invalid") continue;
+      result.set(rel.getAttribute("Id"), decodeURIComponent(resolved.pathname.slice(1)));
+    }
+    return result;
+  }
+
+  // CSV supplies formatted text; XLSX supplies embedded pictures and their original cell anchors.
+  // Match the selected CSV tab to its workbook XML before associating any picture with a person.
+  async function readEmbeddedPhotos(buffer, csvRows, prepared){
+    if(typeof JSZip === "undefined") throw new Error("The image importer did not load. Check your internet connection and reload.");
+    const zip = await JSZip.loadAsync(buffer);
+    const workbook = await readXml(zip, "xl/workbook.xml");
+    const workbookRels = await relationships(zip, "xl/workbook.xml");
+    const strings = zip.file("xl/sharedStrings.xml")
+      ? xmlNodes(await readXml(zip, "xl/sharedStrings.xml"), "si").map(si => xmlNodes(si, "t").map(t => t.textContent).join("")) : [];
+    const nameCol = prepared.headers.indexOf(guessField(prepared.headers, "name"));
+    if(nameCol < 0) throw new Error("A participant Name column is needed to match embedded photos safely.");
+    const candidates = [];
+    for(const sheet of xmlNodes(workbook, "sheet")){
+      const path = workbookRels.get(relationId(sheet, "id"));
+      if(!path || !path.startsWith("xl/worksheets/")) continue;
+      const doc = await readXml(zip, path);
+      const cells = new Map();
+      for(const c of xmlNodes(doc, "c")){
+        const ref = c.getAttribute("r").match(/^([A-Z]+)(\d+)$/);
+        if(!ref) continue;
+        const column = [...ref[1]].reduce((n, char) => n * 26 + char.charCodeAt(0) - 64, 0) - 1;
+        const row = Number(ref[2]) - 1;
+        const type = c.getAttribute("t");
+        if(type === "s" || type === "inlineStr"){
+          const value = type === "s" ? strings[Number(xmlText(c, "v"))] : xmlNodes(c, "t").map(t => t.textContent).join("");
+          cells.set(row + ":" + column, value ?? "");
+        }
+      }
+      const headersMatch = csvRows[0].every((h, col) => String(h ?? "").trim() === (cells.get("0:" + col) || "").trim());
+      const namesMatch = [...prepared.sourceRows.keys()].every(row =>
+        String(csvRows[row][nameCol] ?? "").trim() === (cells.get(row + ":" + nameCol) || "").trim());
+      const textMatches = [...cells].every(([key, value]) => {
+        const [row, col] = key.split(":").map(Number);
+        return !value || String(csvRows[row]?.[col] ?? "").trim() === value.trim();
+      });
+      if(headersMatch && namesMatch && textMatches) candidates.push({doc, path});
+    }
+    if(candidates.length !== 1) throw new Error(candidates.length
+      ? "Several tabs have identical participant data. Keep the participant tab in a separate sheet so photos can be matched unambiguously."
+      : "The text and photo exports did not match. The sheet may have changed during import. Please try again.");
+    const {doc, path} = candidates[0];
+    const sheetRels = await relationships(zip, path);
+    const photoColumn = prepared.headers.indexOf(guessField(prepared.headers, "photo"));
+    const byRow = new Map();
+    for(const drawing of xmlNodes(doc, "drawing")){
+      const drawingPath = sheetRels.get(relationId(drawing, "id"));
+      if(!drawingPath) continue;
+      const drawingDoc = await readXml(zip, drawingPath);
+      const drawingRels = await relationships(zip, drawingPath);
+      for(const anchor of [...xmlNodes(drawingDoc, "oneCellAnchor"), ...xmlNodes(drawingDoc, "twoCellAnchor")]){
+        const from = xmlNodes(anchor, "from")[0];
+        if(!from || Number(xmlText(from, "col")) !== photoColumn) continue;
+        const rowIndex = prepared.sourceRows.get(Number(xmlText(from, "row")));
+        if(rowIndex === undefined) continue;
+        for(const blip of xmlNodes(anchor, "blip")){
+          const imagePath = drawingRels.get(relationId(blip, "embed"));
+          if(!imagePath) continue;
+          const files = byRow.get(rowIndex) || [];
+          files.push(imagePath);
+          byRow.set(rowIndex, files);
+        }
+      }
+    }
+    const photos = {};
+    for(const [row, files] of byRow){
+      if(files.length !== 1) continue; // Never choose arbitrarily between two photos for one person.
+      const path = files[0];
+      const type = {jpg:"image/jpeg", jpeg:"image/jpeg", png:"image/png", gif:"image/gif", webp:"image/webp"}[path.split(".").pop().toLowerCase()];
+      const file = zip.file(path);
+      if(type && file) photos[row] = `data:${type};base64,${await file.async("base64")}`;
+    }
+    return photos;
+  }
+
+  // ---------------- STEP 1: import ----------------
+  document.getElementById("btnFetchSheet").addEventListener("click", async () => {
+    const url = document.getElementById("sheetUrl").value.trim();
+    if(!url){ setStatus("sheetStatus","Paste a Google Sheet link first.", false); return; }
+    const button = document.getElementById("btnFetchSheet");
+    button.disabled = true;
+    setStatus("sheetStatus","Importing participant details and photos…", true);
+    try{
+      const urls = sheetExportUrls(url);
+      const [csvResponse, workbookResponse] = await Promise.all([fetch(urls.csv), fetch(urls.xlsx)]);
+      if(!csvResponse.ok || !workbookResponse.ok) throw new Error("Google could not export the sheet. Check that anyone with the link can view it.");
+      const [csv, buffer] = await Promise.all([csvResponse.text(), workbookResponse.arrayBuffer()]);
+      if(csv.trim().startsWith("<") || new Uint8Array(buffer)[0] !== 80)
+        throw new Error("Google returned a sign-in page instead of the sheet. Check its sharing settings.");
+      // Keep blank rows here: deleting them before extracting anchors would attach photos to the wrong people.
+      const parsed = Papa.parse(csv, {skipEmptyLines:false});
+      if(parsed.errors.some(e => e.type === "Quotes")) throw new Error("The sheet text could not be read.");
+      const prepared = prepareRows(parsed.data);
+      const photos = await readEmbeddedPhotos(buffer, parsed.data, prepared);
+      applyRows(prepared, photos);
+      const count = Object.keys(photos).length;
+      const missing = state.rows.length - count;
+      const message = `Imported ${state.rows.length} participants and ${count} embedded photos.` +
+        (missing ? ` ${missing} row(s) have no unambiguous embedded passport photo. Check the Photo column in Review rows; any mapped image links are still used.` : " Photos are matched to their original sheet rows.");
+      setStatus("sheetStatus", message, true);
+      setStatus("importSummary", message, missing === 0);
+      goToStep(missing ? 2 : 5);
+    }catch(err){
+      setStatus("sheetStatus", "Import failed: " + err.message +
+        (location.protocol === "file:" ? " Open Start Odyssey.cmd from this folder to enable Google Sheets imports." : ""), false);
+    }finally{
+      button.disabled = false;
+    }
+  });
+  document.getElementById("localFileHint").hidden = location.protocol !== "file:";
+
+  document.getElementById("csvFile").addEventListener("change", (e) => {
+    const file = e.target.files[0];
+    if(!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const data = parseCsvText(reader.result);
+      if(loadRowsFromArrayOfArrays(data)){
+        setStatus("csvStatus", `Loaded ${state.rows.length} rows from ${file.name}.`, true);
+        document.getElementById("toStep2").disabled = false;
+        renderTable();
+      }else{
+        setStatus("csvStatus", "Couldn't read any rows from that file.", false);
+      }
+    };
+    reader.readAsText(file);
+  });
+
+  document.getElementById("btnUsePaste").addEventListener("click", () => {
+    const text = document.getElementById("pasteCsv").value;
+    if(!text.trim()){ setStatus("pasteStatus", "Paste some CSV or tab-separated text first.", false); return; }
+    const data = parseCsvText(text);
+    if(loadRowsFromArrayOfArrays(data)){
+      setStatus("pasteStatus", `Loaded ${state.rows.length} rows.`, true);
+      document.getElementById("toStep2").disabled = false;
+      renderTable();
+    }else{
+      setStatus("pasteStatus", "Couldn't parse that text.", false);
+    }
+  });
+
+  document.getElementById("pdfFile").addEventListener("change", async (e) => {
+    const file = e.target.files[0];
+    if(!file) return;
+    setStatus("pdfStatus", "Reading PDF…", true);
+    try{
+      pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+      const buf = await file.arrayBuffer();
+      const pdf = await pdfjsLib.getDocument({data: buf}).promise;
+      let lines = [];
+      for(let p=1; p<=pdf.numPages; p++){
+        const page = await pdf.getPage(p);
+        const content = await page.getTextContent();
+        // group items by approximate y position into lines
+        const byY = {};
+        content.items.forEach(item => {
+          const y = Math.round(item.transform[5]);
+          if(!byY[y]) byY[y] = [];
+          byY[y].push(item);
+        });
+        const ys = Object.keys(byY).map(Number).sort((a,b) => b-a);
+        ys.forEach(y => {
+          const items = byY[y].sort((a,b) => a.transform[4]-b.transform[4]);
+          const text = items.map(i => i.str).join("  ").replace(/\s{2,}/g, " | ").trim();
+          if(text) lines.push(text);
+        });
+      }
+      // naive: split each line on " | " or 2+ spaces into cells
+      const data = lines.map(l => l.split(/\s*\|\s*|\t/).map(c => c.trim()).filter(c => c !== ""));
+      const maxCols = Math.max(...data.map(r => r.length), 1);
+      const padded = data.filter(r => r.length > 1).map(r => {
+        while(r.length < maxCols) r.push("");
+        return r;
+      });
+      if(padded.length < 2){
+        throw new Error("Couldn't detect a clear table in this PDF");
+      }
+      if(loadRowsFromArrayOfArrays(padded)){
+        setStatus("pdfStatus", `Extracted ${state.rows.length} rows — please check them carefully on the next screen, PDF text extraction is approximate.`, true);
+        document.getElementById("toStep2").disabled = false;
+        renderTable();
+      }
+    }catch(err){
+      setStatus("pdfStatus", "Couldn't read a table from that PDF (" + err.message + "). CSV or a Sheet link will be far more reliable.", false);
+    }
+  });
+
+  function normalizeForMatch(s){
+    return (s||"").toString().toUpperCase().replace(/[^A-Z0-9]/g,"");
+  }
+
+  function guessNameColumnIndex(){
+    if(state.mapping.name){
+      const i = state.headers.indexOf(state.mapping.name);
+      if(i >= 0) return i;
+    }
+    let i = state.headers.findIndex(h => /^name$|full ?name/i.test(h));
+    if(i >= 0) return i;
+    i = state.headers.findIndex(h => /name/i.test(h));
+    return i;
+  }
+
+  document.getElementById("btnMatchPhotos").addEventListener("click", () => {
+    const files = Array.from(document.getElementById("bulkPhotoFiles").files || []);
+    if(files.length === 0){
+      setStatus("photoMatchStatus", "Choose one or more photo files first.", false);
+      return;
+    }
+    const nameColIdx = guessNameColumnIndex();
+    if(nameColIdx < 0){
+      setStatus("photoMatchStatus", "Couldn't find a name-like column to match against. Make sure one of your columns is called something like \"Name\".", false);
+      return;
+    }
+    const pool = files.map(f => ({file:f, norm: normalizeForMatch(f.name.replace(/\.[^.]+$/,""))}));
+    let matched = 0;
+    let pending = 0;
+    state.rows.forEach((row, ri) => {
+      const nameNorm = normalizeForMatch(row[nameColIdx]);
+      if(!nameNorm) return;
+      let bestIdx = -1, bestScore = 0;
+      pool.forEach((p, pi) => {
+        if(!p) return;
+        let score = 0;
+        if(p.norm === nameNorm) score = 100;
+        else if(p.norm.includes(nameNorm)) score = 85;
+        else if(nameNorm.includes(p.norm) && p.norm.length >= 4) score = 70;
+        if(score > bestScore){ bestScore = score; bestIdx = pi; }
+      });
+      if(bestIdx >= 0 && bestScore >= 70){
+        const entry = pool[bestIdx];
+        pool[bestIdx] = null;
+        pending++;
+        const reader = new FileReader();
+        reader.onload = () => {
+          state.photoOverrides[ri] = reader.result;
+          pending--;
+          matched++;
+          if(pending === 0){
+            setStatus("photoMatchStatus", `Matched ${matched} photo(s) to rows by filename.`, true);
+            renderTable();
+          }
+        };
+        reader.readAsDataURL(entry.file);
+      }
+    });
+    if(pending === 0){
+      setStatus("photoMatchStatus", "No filenames matched closely enough to a name in your data. You can attach photos individually in the table below.", false);
+    }
+  });
+
+  function attachPhotoToRow(rowIndex, file){
+    const reader = new FileReader();
+    reader.onload = () => {
+      state.photoOverrides[rowIndex] = reader.result;
+      renderTable();
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function convertImageUrl(url){
+    if(!url) return "";
+    const driveFile = url.match(/drive\.google\.com\/file\/d\/([a-zA-Z0-9_-]+)/);
+    if(driveFile) return `https://drive.google.com/thumbnail?sz=w400&id=${driveFile[1]}`;
+    const driveOpen = url.match(/drive\.google\.com\/open\?id=([a-zA-Z0-9_-]+)/);
+    if(driveOpen) return `https://drive.google.com/thumbnail?sz=w400&id=${driveOpen[1]}`;
+    const driveGeneric = url.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+    if(driveGeneric && url.includes("drive.google.com")) return `https://drive.google.com/thumbnail?sz=w400&id=${driveGeneric[1]}`;
+    return url;
+  }
+
+  // ---------------- STEP 2: review table ----------------
+  function renderTable(){
+    const table = document.getElementById("dataTable");
+    table.innerHTML = "";
+    const thead = document.createElement("thead");
+    const headRow = document.createElement("tr");
+    state.headers.forEach((h, ci) => {
+      const th = document.createElement("th");
+      th.contentEditable = "true";
+      th.textContent = h;
+      th.addEventListener("blur", () => { state.headers[ci] = th.textContent.trim() || "Column"; refreshMappingOptions(); });
+      headRow.appendChild(th);
+    });
+    const thAction = document.createElement("th");
+    thAction.textContent = "Photo";
+    headRow.appendChild(thAction);
+    const thRemove = document.createElement("th");
+    thRemove.textContent = "";
+    headRow.appendChild(thRemove);
+    thead.appendChild(headRow);
+    table.appendChild(thead);
+
+    const tbody = document.createElement("tbody");
+    state.rows.forEach((row, ri) => {
+      const tr = document.createElement("tr");
+      state.headers.forEach((_, ci) => {
+        const td = document.createElement("td");
+        td.contentEditable = "true";
+        td.textContent = row[ci] || "";
+        td.addEventListener("blur", () => { state.rows[ri][ci] = td.textContent; });
+        tr.appendChild(td);
+      });
+
+      const tdPhoto = document.createElement("td");
+      tdPhoto.className = "photo-cell";
+      if(state.photoOverrides[ri]){
+        const img = document.createElement("img");
+        img.className = "thumb";
+        img.src = state.photoOverrides[ri];
+        tdPhoto.appendChild(img);
+        const clear = document.createElement("button");
+        clear.className = "clear-photo";
+        clear.textContent = "remove";
+        clear.addEventListener("click", () => { delete state.photoOverrides[ri]; renderTable(); });
+        tdPhoto.appendChild(clear);
+      }else{
+        const ph = document.createElement("div");
+        ph.className = "placeholder-thumb";
+        ph.textContent = "—";
+        tdPhoto.appendChild(ph);
+        const fileInput = document.createElement("input");
+        fileInput.type = "file";
+        fileInput.accept = "image/*";
+        fileInput.addEventListener("change", (e) => {
+          if(e.target.files[0]) attachPhotoToRow(ri, e.target.files[0]);
+        });
+        tdPhoto.appendChild(fileInput);
+      }
+      tr.appendChild(tdPhoto);
+
+      const tdAction = document.createElement("td");
+      const rm = document.createElement("button");
+      rm.textContent = "✕";
+      rm.className = "remove-x";
+      rm.title = "Remove row";
+      rm.addEventListener("click", () => {
+        state.rows.splice(ri,1);
+        const shifted = {};
+        Object.keys(state.photoOverrides).forEach(k => {
+          const idx = Number(k);
+          if(idx < ri) shifted[idx] = state.photoOverrides[idx];
+          else if(idx > ri) shifted[idx-1] = state.photoOverrides[idx];
+          // idx === ri is dropped
+        });
+        state.photoOverrides = shifted;
+        renderTable();
+      });
+      tdAction.appendChild(rm);
+      tr.appendChild(tdAction);
+      tbody.appendChild(tr);
+    });
+    table.appendChild(tbody);
+    document.getElementById("rowCount").textContent = state.rows.length + " rows, " + state.headers.length + " columns";
+    refreshMappingOptions();
+  }
+
+  document.getElementById("addRow").addEventListener("click", () => {
+    state.rows.push(state.headers.map(() => ""));
+    renderTable();
+  });
+  document.getElementById("addCol").addEventListener("click", () => {
+    state.headers.push("Column " + (state.headers.length+1));
+    state.rows.forEach(r => r.push(""));
+    renderTable();
+  });
+
+  // ---------------- STEP 3: mapping ----------------
+  function refreshMappingOptions(){
+    const grid = document.getElementById("mappingGrid");
+    grid.innerHTML = "";
+    FIELD_DEFS.forEach(f => {
+      const wrap = document.createElement("div");
+      wrap.className = "map-field";
+      const label = document.createElement("label");
+      label.innerHTML = f.label + (f.required ? ' <span class="req">*</span>' : "");
+      const select = document.createElement("select");
+      select.dataset.field = f.key;
+      const noneOpt = document.createElement("option");
+      noneOpt.value = "";
+      noneOpt.textContent = "— none —";
+      select.appendChild(noneOpt);
+      state.headers.forEach(h => {
+        const opt = document.createElement("option");
+        opt.value = h;
+        opt.textContent = h;
+        if(state.mapping[f.key] === h) opt.selected = true;
+        select.appendChild(opt);
+      });
+      // Guess once; an explicitly cleared mapping must stay cleared.
+      if(!Object.prototype.hasOwnProperty.call(state.mapping, f.key)) state.mapping[f.key] = guessField(state.headers, f.key);
+      select.value = state.mapping[f.key];
+      select.addEventListener("change", () => { state.mapping[f.key] = select.value; });
+      wrap.appendChild(label);
+      wrap.appendChild(select);
+      grid.appendChild(wrap);
+    });
+
+    // group-by field options
+    const groupSel = document.getElementById("groupByField");
+    const currentGroup = groupSel.value;
+    groupSel.innerHTML = '<option value="">— one single page, no grouping —</option>';
+    state.headers.forEach(h => {
+      const opt = document.createElement("option");
+      opt.value = h; opt.textContent = h;
+      if(h === currentGroup) opt.selected = true;
+      groupSel.appendChild(opt);
+    });
+  }
+
+  // ---------------- STEP 4: template settings ----------------
+  function renderColorRules(){
+    const list = document.getElementById("colorRulesList");
+    list.innerHTML = "";
+    state.colorRules.forEach((rule, i) => {
+      const row = document.createElement("div");
+      row.className = "color-rule-row";
+
+      const input = document.createElement("input");
+      input.type = "text";
+      input.value = rule.contains;
+      input.placeholder = "text to match in Position (e.g. SUPERVISOR)";
+      input.addEventListener("input", () => rule.contains = input.value);
+
+      const select = document.createElement("select");
+      ["green","gold","purple","gray"].forEach(c => {
+        const opt = document.createElement("option");
+        opt.value = c; opt.textContent = c.charAt(0).toUpperCase()+c.slice(1);
+        if(rule.color === c) opt.selected = true;
+        select.appendChild(opt);
+      });
+      select.addEventListener("change", () => rule.color = select.value);
+
+      const rm = document.createElement("button");
+      rm.textContent = "✕";
+      rm.className = "remove-x";
+      rm.addEventListener("click", () => { state.colorRules.splice(i,1); renderColorRules(); });
+
+      row.appendChild(input);
+      row.appendChild(select);
+      row.appendChild(rm);
+      list.appendChild(row);
+    });
+  }
+  document.getElementById("addColorRule").addEventListener("click", () => {
+    state.colorRules.push({contains:"", color:"gray"});
+    renderColorRules();
+  });
+
+  document.getElementById("logoFile").addEventListener("change", (e) => {
+    const file = e.target.files[0];
+    if(!file) return;
+    const reader = new FileReader();
+    reader.onload = () => { state.logoDataUrl = reader.result; };
+    reader.readAsDataURL(file);
+  });
+
+  document.getElementById("extraLogoFiles").addEventListener("change", (e) => {
+    const files = Array.from(e.target.files || []);
+    let pending = files.length;
+    if(pending === 0) return;
+    files.forEach(file => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        state.extraLogos.push(reader.result);
+        renderExtraLogoList();
+      };
+      reader.readAsDataURL(file);
+    });
+    e.target.value = "";
+  });
+
+  function renderExtraLogoList(){
+    const wrap = document.getElementById("extraLogoList");
+    wrap.innerHTML = "";
+    if(state.extraLogos.length === 0) return;
+    const list = document.createElement("div");
+    list.className = "logo-thumb-list";
+    state.extraLogos.forEach((src, i) => {
+      const thumb = document.createElement("div");
+      thumb.className = "logo-thumb";
+      const img = document.createElement("img");
+      img.src = src;
+      const rm = document.createElement("button");
+      rm.textContent = "✕";
+      rm.title = "Remove this logo";
+      rm.addEventListener("click", () => { state.extraLogos.splice(i,1); renderExtraLogoList(); });
+      thumb.appendChild(img);
+      thumb.appendChild(rm);
+      list.appendChild(thumb);
+    });
+    wrap.appendChild(list);
+  }
+
+  document.getElementById("regionIconFile").addEventListener("change", (e) => {
+    const file = e.target.files[0];
+    if(!file) return;
+    const reader = new FileReader();
+    reader.onload = () => { state.regionIconDataUrl = reader.result; };
+    reader.readAsDataURL(file);
+  });
+
+  // ---------------- color logic ----------------
+  function colorForPosition(position, fallbackIndex){
+    const p = (position || "").toUpperCase();
+    for(const rule of state.colorRules){
+      if(rule.contains && p.includes(rule.contains.toUpperCase())) return rule.color;
+    }
+    const palette = ["green","gold","purple"];
+    return palette[fallbackIndex % palette.length];
+  }
+
+  // ---------------- STEP 5: preview / build voucher HTML ----------------
+  function colIndex(field){
+    const h = state.mapping[field];
+    return h ? state.headers.indexOf(h) : -1;
+  }
+
+  function buildRecords(){
+    const idx = {};
+    FIELD_DEFS.forEach(f => idx[f.key] = colIndex(f.key));
+    return state.rows.map((r, ri) => {
+      const rec = {__idx: ri};
+      FIELD_DEFS.forEach(f => rec[f.key] = idx[f.key] >= 0 ? (r[idx[f.key]] || "") : "");
+      return rec;
+    });
+  }
+
+  function groupRecords(records){
+    const groupField = document.getElementById("groupByField").value;
+    if(!groupField) return [{label:"", records}];
+    const gi = state.headers.indexOf(groupField);
+    if(gi < 0) return [{label:"", records}];
+    const groups = {};
+    state.rows.forEach((r, i) => {
+      const key = (r[gi] || "Ungrouped").toString().trim() || "Ungrouped";
+      if(!groups[key]) groups[key] = [];
+      groups[key].push(records[i]);
+    });
+    return Object.keys(groups).map(k => ({label:k, records:groups[k]}));
+  }
+
+  function escapeHtml(s){
+    return (s||"").toString()
+      .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")
+      .replace(/"/g,"&quot;").replace(/'/g,"&#39;");
+  }
+
+  function renderVoucherCard(rec, colorIdx){
+    const color = colorForPosition(rec.position, colorIdx);
+    const resolvedPhoto = state.photoOverrides[rec.__idx] || convertImageUrl(rec.photo);
+    const isDataUrl = resolvedPhoto && resolvedPhoto.startsWith("data:");
+    const photoCell = resolvedPhoto
+      ? `<img src="${escapeHtml(resolvedPhoto)}" alt="Passport photo" ${isDataUrl ? "" : 'crossorigin="anonymous"'}>`
+      : `<div class="placeholder">—</div>`;
+    const orgHeader = document.getElementById("orgHeader").value;
+    return `
+    <div class="voucher-entry"><div class="v-card ${color}">
+      <div class="v-head">Name</div>
+      <div class="v-head">Position</div>
+      <div class="v-head">${escapeHtml(orgHeader)}</div>
+      <div class="v-head">Phone number</div>
+      <div class="v-head">Address</div>
+      <div class="v-head">Passport</div>
+    </div>
+    <div class="v-card ${color}" style="margin-top:-10px;">
+      <div class="v-body">
+        <div class="v-name-main">${escapeHtml(rec.name) || "—"}</div>
+        <div class="v-name-sub">
+          <b>Acct. No:</b> ${escapeHtml(rec.acctNo)}<br>
+          <b>Bank:</b> ${escapeHtml(rec.bankName)}<br>
+          <b>Acct name:</b> ${escapeHtml(rec.acctName)}
+        </div>
+      </div>
+      <div class="v-body"><div class="v-position">${escapeHtml(rec.position)}</div></div>
+      <div class="v-body" style="text-align:center;">${rec.company && rec.org
+        ? `<div><b>Company:</b> ${escapeHtml(rec.company)}</div><div><b>NGO:</b> ${escapeHtml(rec.org)}</div>`
+        : escapeHtml(rec.company || rec.org)}</div>
+      <div class="v-body" style="text-align:center;">${escapeHtml(rec.phone)}</div>
+      <div class="v-body" style="font-size:10.5px;">${escapeHtml(rec.address)}</div>
+      <div class="v-body v-photo">${photoCell}</div>
+    </div></div>`;
+  }
+
+  function renderPreview(){
+    const records = buildRecords();
+    const container = document.getElementById("previewContent");
+    if(records.length === 0){
+      container.innerHTML = '<div class="empty-note">No rows yet — go back and import your data.</div>';
+      return;
+    }
+    const groups = groupRecords(records);
+    const docTitle = document.getElementById("docTitle").value;
+    const badgeText = document.getElementById("badgeText").value;
+    const partnerLabel = document.getElementById("partnerLabel").value;
+    const appendGroup = document.getElementById("appendGroupToTitle").value === "yes";
+
+    let html = "";
+    groups.forEach(group => {
+      const title = (appendGroup && group.label) ? `${docTitle} — ${group.label}` : docTitle;
+      const partnerLogosHtml = state.extraLogos.length
+        ? `<div class="v-partner-row">${state.extraLogos.map(src => `<img src="${src}">`).join("")}</div>`
+        : "";
+      const regionIconHtml = state.regionIconDataUrl
+        ? `<img class="v-region-icon" src="${state.regionIconDataUrl}">`
+        : "";
+      html += `<div class="pdf-page">
+        <div class="v-banner">
+          <div class="v-logo">${state.logoDataUrl ? `<img src="${state.logoDataUrl}">` : "LOGO"}</div>
+        </div>
+        ${partnerLogosHtml}
+        <div class="v-title">${escapeHtml(title)}</div>
+        <div class="v-badge-row"><span class="v-badge">${escapeHtml(badgeText)}</span></div>
+        <div class="v-meta-row">
+          <span class="group-label">${regionIconHtml}${escapeHtml(group.label)}</span>
+          <span>${escapeHtml(partnerLabel)}</span>
+        </div>
+        ${group.records.map((rec, i) => renderVoucherCard(rec, i)).join("")}
+      </div>`;
+    });
+    container.innerHTML = html;
+  }
+
+  document.getElementById("btnRefreshPreview").addEventListener("click", renderPreview);
+
+  async function waitForImages(container){
+    await Promise.all([...container.querySelectorAll("img")].map(img => new Promise((resolve, reject) => {
+      const finish = () => { cleanup(); img.naturalWidth ? resolve() : reject(new Error("A photo or logo could not load. Check the preview before exporting.")); };
+      const cleanup = () => { clearTimeout(timer); img.removeEventListener("load", finish); img.removeEventListener("error", finish); };
+      const timer = setTimeout(() => { cleanup(); reject(new Error("An image took too long to load. Please try again.")); }, 20000);
+      img.addEventListener("load", finish);
+      img.addEventListener("error", finish);
+      if(img.complete) finish();
+    })));
+  }
+
+  document.getElementById("btnExportPdf").addEventListener("click", async () => {
+    const button = document.getElementById("btnExportPdf");
+    button.disabled = true;
+    setStatus("exportStatus", "Preparing photos and PDF…", true);
+    try{
+      if(!state.rows.length) throw new Error("Import participant data first.");
+      renderPreview();
+      const el = document.getElementById("previewContent");
+      await waitForImages(el);
+      const opt = {
+        margin: 0,
+        filename: "vouchers.pdf",
+        image: {type:"jpeg", quality:0.98},
+        html2canvas: {scale:2, useCORS:true},
+        jsPDF: {unit:"px", format:[1060,1500], orientation:"portrait"},
+        pagebreak: {mode:["css"], avoid:[".voucher-entry"]}
+      };
+      await html2pdf().set(opt).from(el).save();
+      setStatus("exportStatus", "PDF download ready.", true);
+    }catch(err){
+      setStatus("exportStatus", err.message, false);
+    }finally{ button.disabled = false; }
+  });
+
+  // ---------------- step navigation ----------------
+  const steps = [1,2,3,4,5];
+  function goToStep(n){
+    steps.forEach(s => {
+      document.getElementById("panel-"+s).classList.toggle("visible", s===n);
+    });
+    document.querySelectorAll(".step-nav button").forEach(btn => {
+      const s = Number(btn.dataset.step);
+      btn.classList.toggle("active", s===n);
+      btn.classList.toggle("done", s<n);
+    });
+    if(n===3) refreshMappingOptions();
+    if(n===4){ renderColorRules(); renderExtraLogoList(); }
+    if(n===5) renderPreview();
+  }
+  document.querySelectorAll(".step-nav button").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const s = Number(btn.dataset.step);
+      if(s>1 && state.rows.length===0){ return; }
+      goToStep(s);
+    });
+  });
+  document.getElementById("toStep2").addEventListener("click", () => goToStep(2));
+  document.getElementById("back1").addEventListener("click", () => goToStep(1));
+  document.getElementById("toStep3").addEventListener("click", () => goToStep(3));
+  document.getElementById("back2").addEventListener("click", () => goToStep(2));
+  document.getElementById("toStep4").addEventListener("click", () => goToStep(4));
+  document.getElementById("back3").addEventListener("click", () => goToStep(3));
+  document.getElementById("toStep5").addEventListener("click", () => goToStep(5));
+  document.getElementById("back4").addEventListener("click", () => goToStep(4));
+
+  renderColorRules();
+})();
+</script>
+</body>
+</html>
