@@ -74,8 +74,18 @@ if __name__ == "__main__":
         if "PORT" in os.environ:
             print(f"Odyssey is running on port {actual_port}", flush=True)
         else:
-            url = f"http://127.0.0.1:{actual_port}/"
+            # If HOPE_V2 env is set (Start Hope V2.cmd), open /v2 directly
+            is_v2_launch = os.environ.get("HOPE_V2") == "1" or HOPE_V2.exists()
+            # For local, default open V2 if available, else root
+            base = f"http://127.0.0.1:{actual_port}"
+            url = f"{base}/v2" if HOPE_V2.exists() and is_v2_launch else f"{base}/"
+            # If launched via Hope V2, ensure we signal it
+            if os.environ.get("HOPE_V2") == "1":
+                url = f"{base}/v2"
             print(f"Odyssey is running at {url}", flush=True)
+            print(f"  Classic: {base}/", flush=True)
+            if HOPE_V2.exists():
+                print(f"  Hope V2: {base}/v2", flush=True)
             try:
                 webbrowser.open(url)
             except Exception:
