@@ -1,10 +1,13 @@
 services:
   - type: web
-    name: voucher-generator
+    name: hope-voucher-v2
     env: python
     plan: free
     buildCommand: ""
     startCommand: "python odyssey-local.py"
+    # On Render, / serves Hope Voucher V2 (exact PDF2 replica), classic at /v2
+    # Locally: http://127.0.0.1:<port>/ = classic, /v2 = Hope V2
+    # Start Hope V2.cmd sets HOPE_V2=1 to open /v2 directly
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.0
