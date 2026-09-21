@@ -688,8 +688,6 @@
     });
     document.getElementById("toStep2").disabled = false;
     renderTable();
-    const org = state.mapping.org, company = state.mapping.company;
-    document.getElementById("orgHeader").value = org && company ? "COMPANY / NGO" : company ? "COMPANY" : "NGO";
   }
 
   function loadRowsFromArrayOfArrays(arr){
